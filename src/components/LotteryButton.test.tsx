@@ -2,56 +2,69 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import LotteryButton from './LotteryButton';
 
-describe('LotteryButton with history', () => {
+describe('LotteryButton no-duplicate draw', () => {
   beforeEach(() => {
-    // 固定された乱数でテストの再現性を確保
-    jest.spyOn(global.Math, 'random').mockReturnValue(0.5);
-    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000); // 固定時刻
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  test('initially shows empty history and empty result', () => {
-    render(<LotteryButton min={1} max={10} historyLimit={5} />);
-    expect(screen.getByText('結果はまだありません')).toBeInTheDocument();
-    expect(screen.getByText('履歴はありません')).toBeInTheDocument();
-  });
-
-  test('clicking button shows result and adds to history', () => {
-    render(<LotteryButton min={1} max={10} historyLimit={5} />);
-    const button = screen.getByRole('button', { name: '抽選ボタン' });
-
-    fireEvent.click(button);
-
-    // 0.5 * (10 - 1 + 1) = 5 -> min + 5 = 6
-    expect(screen.getByText('6')).toBeInTheDocument();
-
-    // 履歴に追加された番号が表示される
-    expect(screen.getByText(/番号: 6/)).toBeInTheDocument();
-  });
-
-  test('history respects limit and can be cleared', () => {
-    const seq = [0.0, 0.99, 0.5]; // 1, 10, 6 を引く
+  test('draws from remaining candidates and updates history', () => {
+    // Math.random シーケンスで 1→2→3 を引く（min=1, max=3）
+    const seq = [0.0, 0.5, 0.99];
     let i = 0;
-    jest.spyOn(global.Math, 'random').mockImplementation(() => seq[i++]);
-    jest.spyOn(Date, 'now').mockImplementation(() => 1_700_000_000_000 + i);
+    jest.spyOn(Math, 'random').mockImplementation(() => seq[i++]);
 
-    render(<LotteryButton min={1} max={10} historyLimit={2} />);
+    render(<LotteryButton min={1} max={3} historyLimit={10} />);
     const button = screen.getByRole('button', { name: '抽選ボタン' });
 
-    fireEvent.click(button); // 1
-    fireEvent.click(button); // 10
-    fireEvent.click(button); // 6 （limit=2なので最新2件のみ保持）
+    // 1回目: candidates=[1,2,3], idx=0 -> 1
+    fireEvent.click(button);
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText(/番号: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/残り抽選可能数: 2/)).toBeInTheDocument();
 
-    const rows = screen.getAllByText(/番号:/);
-    expect(rows).toHaveLength(2);
-    expect(screen.getByText(/番号: 6/)).toBeInTheDocument();
-    expect(screen.getByText(/番号: 10/)).toBeInTheDocument();
+    // 2回目: candidates=[2,3], idx=floor(0.5*2)=1 -> 3
+    fireEvent.click(button);
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText(/番号: 3/)).toBeInTheDocument();
+    expect(screen.getByText(/残り抽選可能数: 1/)).toBeInTheDocument();
 
+    // 3回目: candidates=[2], idx=floor(0.99*1)=0 -> 2
+    fireEvent.click(button);
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText(/番号: 2/)).toBeInTheDocument();
+    expect(screen.getByText(/残り抽選可能数: 0/)).toBeInTheDocument();
+
+    // ボタンは無効化される
+    const drawButton = screen.getByRole('button', { name: '抽選ボタン' });
+    expect(drawButton).toBeDisabled();
+  });
+
+  test('shows error when candidates are exhausted and clear resets state', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.0);
+
+    render(<LotteryButton min={1} max={1} historyLimit={10} />);
+    const button = screen.getByRole('button', { name: '抽選ボタン' });
+
+    // 1回目で唯一の候補を引く
+    fireEvent.click(button);
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText(/残り抽選可能数: 0/)).toBeInTheDocument();
+    expect(button).toBeDisabled();
+
+    // ボタン押しても候補がないためエラーが表示される（UIはdisabledだが、保険としてハンドラ側でも扱う）
+    fireEvent.click(button);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    // クリアで再度抽選可能に
     const clearBtn = screen.getByRole('button', { name: '履歴をクリア' });
     fireEvent.click(clearBtn);
+    expect(screen.getByText('結果はまだありません')).toBeInTheDocument();
     expect(screen.getByText('履歴はありません')).toBeInTheDocument();
+    expect(screen.getByText(/残り抽選可能数: 1/)).toBeInTheDocument();
+    expect(button).not.toBeDisabled();
   });
 });

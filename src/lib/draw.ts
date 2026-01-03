@@ -32,3 +32,26 @@ export function appendRecord(
   }
   return next;
 }
+
+// 履歴に出現した番号を除外した候補配列を作成
+export function buildCandidates(min: number, max: number, history: DrawRecord[]): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error('min/max must be finite numbers');
+  if (Math.floor(min) !== min || Math.floor(max) !== max) throw new Error('min/max must be integers');
+  if (max < min) throw new Error('max must be >= min');
+
+  const used = new Set<number>(history.map(h => h.value));
+  const candidates: number[] = [];
+  for (let n = min; n <= max; n++) {
+    if (!used.has(n)) candidates.push(n);
+  }
+  return candidates;
+}
+
+// 候補からランダムに1つ選ぶ（候補が無ければ例外）
+export function drawFromCandidates(candidates: number[]): number {
+  if (candidates.length === 0) {
+    throw new Error('No candidates left');
+  }
+  const idx = Math.floor(Math.random() * candidates.length);
+  return candidates[idx];
+}
