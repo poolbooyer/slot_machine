@@ -1,40 +1,56 @@
 import { useState } from 'react';
-import { drawRandomInt, appendRecord, type DrawRecord } from '../lib/draw';
+import { appendRecord, buildCandidates, drawFromCandidates, type DrawRecord } from '../lib/draw';
 
 type LotteryButtonProps = {
   min?: number;
   max?: number;
-  historyLimit?: number;
+  historyLimit?: number; // 履歴の最大件数（UI表示のため）
 };
 
-export default function LotteryButton({ min = 1, max = 100, historyLimit, }: LotteryButtonProps) {
+export default function LotteryButton({
+  min = 1,
+  max = 100,
+  historyLimit,
+}: LotteryButtonProps) {
   const [result, setResult] = useState<number | null>(null);
   const [history, setHistory] = useState<DrawRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const handleClick = () => {
-    const drawn = drawRandomInt(min, max);
-    setResult(drawn);
-    const record: DrawRecord = { value: drawn, timestamp: Date.now() };
-    setHistory((prev) => appendRecord(prev, record, historyLimit));
+    setError(null);
+    // 履歴を踏まえて未抽選の候補を作る
+    const candidates = buildCandidates(min, max, history);
+    try {
+      const drawn = drawFromCandidates(candidates);
+      setResult(drawn);
+      const record: DrawRecord = { value: drawn, timestamp: Date.now() };
+      setHistory((prev) => appendRecord(prev, record, historyLimit));
+    } catch (e) {
+      // 候補が尽きた場合
+      setError('抽選可能な番号はありません（上限に達しました）');
+    }
   };
 
   const handleClearHistory = () => {
     setHistory([]);
+    setResult(null);
+    setError(null);
   };
 
   return (
-    <div style={{ display: 'grid', gap: '12px', maxWidth: 480 }}>
+    <div style={{ display: 'grid', gap: '12px', maxWidth: 520 }}>
       <button
         type="button"
         onClick={handleClick}
         aria-label="抽選ボタン"
+        disabled={buildCandidates(min, max, history).length === 0}
         style={{
           padding: '10px 16px',
           fontSize: '16px',
-          cursor: 'pointer',
+          cursor: buildCandidates(min, max, history).length === 0 ? 'not-allowed' : 'pointer',
           borderRadius: 8,
           border: '1px solid #ccc',
-          background: '#1f6feb',
+          background: buildCandidates(min, max, history).length === 0 ? '#999' : '#1f6feb',
           color: '#fff',
         }}
       >
@@ -58,6 +74,21 @@ export default function LotteryButton({ min = 1, max = 100, historyLimit, }: Lot
       >
         {result === null ? '結果はまだありません' : result}
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            padding: '8px 10px',
+            borderRadius: 6,
+            background: '#fff3cd',
+            color: '#664d03',
+            border: '1px solid #ffe69c',
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       <section aria-label="抽選履歴">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -104,6 +135,9 @@ export default function LotteryButton({ min = 1, max = 100, historyLimit, }: Lot
             ))}
           </ul>
         )}
+        <p style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
+          残り抽選可能数: {buildCandidates(min, max, history).length}
+        </p>
       </section>
     </div>
   );
