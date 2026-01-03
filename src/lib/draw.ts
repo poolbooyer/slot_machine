@@ -14,3 +14,21 @@ export function drawRandomInt(min: number, max: number): number {
   const r = Math.floor(Math.random() * range);
   return min + r;
 }
+
+// 履歴を管理する純関数群（テストしやすくするためUIから分離）
+export type DrawRecord = {
+  value: number;
+  timestamp: number; // epoch millis
+};
+
+export function appendRecord(
+  history: DrawRecord[],
+  record: DrawRecord,
+  limit?: number
+): DrawRecord[] {
+  const next = [record, ...history];
+  if (typeof limit === 'number' && limit > 0) {
+    return next.slice(0, limit);
+  }
+  return next;
+}
