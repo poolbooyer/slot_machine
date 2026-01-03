@@ -18,7 +18,8 @@ export function drawRandomInt(min: number, max: number): number {
 // 履歴を管理する純関数群（テストしやすくするためUIから分離）
 export type DrawRecord = {
   value: number;
-  timestamp: number; // epoch millis
+  timestamp: number;
+  prizeName?: string;
 };
 
 export function appendRecord(
