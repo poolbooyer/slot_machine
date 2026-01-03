@@ -1,0 +1,47 @@
+name: CI - Test
+
+on:
+  push:
+    branches:
+      - '**'            # すべてのブランチへのpushで実行（必要に応じて main などに絞り込み可）
+  pull_request:
+    branches:
+      - '**'            # すべてのPRで実行
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20]         # 必要なら [18, 20] の複数バージョンでも可
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify TypeScript build (optional)
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm test -- --ci --reporters=default --reporters=jest-junit
+        env:
+          CI: true
+
+      - name: Upload JUnit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-junit-report
+          path: ./junit.xml
+          if-no-files-found: ignore
