@@ -84,7 +84,8 @@ describe('Lottery with global non-duplicate numbers across prizes', () => {
     expect(screen.getByText(/残り: 1/)).toBeInTheDocument();
 
     await user.click(drawButton);
-    expect(screen.getByText(/残り抽選可能数（全賞共通）: 0/)).toBeInTheDocument();
+    const leaveLotteryCount = screen.getAllByText(/残り: 0/);
+    expect(leaveLotteryCount).toHaveLength(2);
 
     // 候補尽き → disabled
     expect(drawButton).toBeDisabled();
