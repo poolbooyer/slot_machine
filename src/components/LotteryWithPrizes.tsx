@@ -21,6 +21,7 @@ export default function LotteryWithPrizes({
   const [_, setUsedNumbers] = useState<number[]>([]); // 全賞共通の使用済み番号
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [globalLimit, setGlobalLimit] = useState<number | null>(null);
 
   const selectedPrize = useMemo(
     () => prizes.find(p => p.id === selectedPrizeId) ?? null,
@@ -40,7 +41,16 @@ export default function LotteryWithPrizes({
   }, [selectedPrize, consumedForSelectedPrize]);
 
   // 候補はグローバル使用済みを除外した min〜max
-  const candidates = useMemo(() => buildCandidates(min, max, history), [min, max, history]);
+  const candidates = useMemo(
+  () => buildCandidates(min, max, history, globalLimit),
+  [min, max, history, globalLimit]
+);
+
+  // グローバル上限の判定
+  const globalRemaining = useMemo(() => {
+    if (globalLimit === null) return Infinity;
+    return Math.max(0, globalLimit - history.length);
+  }, [globalLimit, history.length]);
 
   const canDraw = !!selectedPrize && remainingForSelectedPrize > 0 && candidates.length > 0;
 
@@ -48,6 +58,10 @@ export default function LotteryWithPrizes({
     setError(null);
     if (!selectedPrize) {
       setError('賞が選択されていません');
+      return;
+    }
+    if (globalRemaining <= 0) {
+      setError('全体の抽選上限に達しました');
       return;
     }
     if (!canDraw) {
@@ -96,10 +110,12 @@ export default function LotteryWithPrizes({
           prizes={prizes}
           onChange={(next) => {
             setPrizes(next);
-            if (selectedPrizeId && !next.some(p => p.id === selectedPrizeId)) {
+            if (selectedPrizeId && !next.some((p) => p.id === selectedPrizeId)) {
               setSelectedPrizeId(null);
             }
           }}
+          globalLimit={globalLimit}
+          onChangeGlobalLimit={setGlobalLimit}
         />
       )}
 
@@ -210,6 +226,10 @@ export default function LotteryWithPrizes({
             履歴をクリア
           </button>
         </div>
+        <div style={{ color: '#666', fontSize: 12 }}>
+          全体の上限: {globalLimit === null ? '無制限' : globalLimit} / 現在の当選総数: {history.length} / 残り:{' '}
+          {globalRemaining === Infinity ? '∞' : globalRemaining}
+        </div>
         {history.length === 0 ? (
           <p style={{ color: '#666', marginTop: 8 }}>履歴はありません</p>
         ) : (
@@ -238,9 +258,6 @@ export default function LotteryWithPrizes({
             ))}
           </ul>
         )}
-        <p style={{ color: '#666', fontSize: 12, marginTop: 6 }}>
-          残り抽選可能数（全賞共通）: {candidates.length}
-        </p>
       </section>
     </div>
   );
