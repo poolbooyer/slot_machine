@@ -34,15 +34,38 @@ export function appendRecord(
   return next;
 }
 
-// 履歴に出現した番号を除外した候補配列を作成
-export function buildCandidates(min: number, max: number, history: DrawRecord[]): number[] {
+/**
+ * 候補生成（グローバル使用済み・グローバル上限に基づく）
+ * - globalLimitが数値なら、番号の上限をその値までに制約（min〜effectiveMax）
+ * - usedNumbersに含まれる番号は除外
+ */
+// src/lib/draw.ts（確認・修正）
+export function buildCandidates(
+  min: number,
+  max: number,
+  history: DrawRecord[],
+  globalLimit: number | null = null
+): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error('min/max must be finite numbers');
   if (Math.floor(min) !== min || Math.floor(max) !== max) throw new Error('min/max must be integers');
   if (max < min) throw new Error('max must be >= min');
 
+  if (globalLimit !== null) {
+    if (!Number.isFinite(globalLimit)) throw new Error('globalLimit must be a finite number or null');
+  }
+
+  let effectiveMax = max;
+  if (globalLimit !== null) {
+    const gl = Math.floor(globalLimit);
+    if (gl < min) return [];
+    effectiveMax = Math.min(max, gl);
+  }
+
+  if (effectiveMax < min) return [];
+
   const used = new Set<number>(history.map(h => h.value));
   const candidates: number[] = [];
-  for (let n = min; n <= max; n++) {
+  for (let n = min; n <= effectiveMax; n++) {
     if (!used.has(n)) candidates.push(n);
   }
   return candidates;

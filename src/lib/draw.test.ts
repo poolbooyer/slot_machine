@@ -79,3 +79,27 @@ describe('appendRecord (with prizeName)', () => {
     expect(next[0].prizeName).toBe('金賞');
   });
 });
+
+describe('buildCandidates with globalLimit', () => {
+  test('limits max number to globalLimit when provided', () => {
+    // min=1, max=100, globalLimit=50 → 候補は1〜50
+    const candidates = buildCandidates(1, 100, [], 50);
+    expect(candidates[0]).toBe(1);
+    expect(candidates[candidates.length - 1]).toBe(50);
+  });
+
+  test('returns empty when globalLimit < min', () => {
+    // min=10, globalLimit=5 -> empty
+    expect(buildCandidates(10, 100, [], 5)).toEqual([]);
+  });
+
+  test('excludes usedNumbers within limited range', () => {
+    const history: DrawRecord[] = [
+      { value: 3, timestamp: 1, prizeName: 'A' },
+      { value: 4, timestamp: 2, prizeName: 'B' },
+      { value: 9, timestamp: 1, prizeName: 'A' },
+    ];
+    const candidates = buildCandidates(1, 10, history, 5);
+    expect(candidates).toEqual([1, 2, 5]); // 3,4は使用済み、6〜10は上限超過で除外
+  });
+});
